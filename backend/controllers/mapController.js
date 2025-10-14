@@ -1,96 +1,126 @@
 import axios from "axios";
-import { getRandomPoints } from "../utils/geoUtils.js";
 
 export const analyzePolygon = async (req, res) => {
   try {
     const { polygon } = req.body;
-    const points = getRandomPoints(polygon, 10);
+    console.log("📩 Received polygon:", JSON.stringify(polygon, null, 2));
 
-    const predictions = await Promise.all(
-      points.map(async ([lon, lat]) => {
+    if (!polygon || !polygon.coordinates) {
+      return res.status(400).json({ error: "Invalid polygon data" });
+    }
+
+    const coordinates = polygon.coordinates[0];
+    const limitedCoords = coordinates.slice(0, 6);
+    console.log(`🧮 Fetching real-time data for ${limitedCoords.length} points...`);
+
+    const results = await Promise.all(
+      limitedCoords.map(async ([lng, lat]) => {
         try {
-          // 1️⃣ Soil data from SoilGrids
-          const soilRes = await axios.get(
-            `https://rest.soilgrids.org/query?lon=${lon}&lat=${lat}`
+          // 🧱 SOIL DATA (ISRIC SoilGrids)
+          const soilUrl = `https://rest.isric.org/soilgrids/v2.0/properties/query?lon=${lng}&lat=${lat}&depth=0-5cm`;
+          const soilRes = await axios.get(soilUrl, { timeout: 15000 });
+
+          const layers = soilRes.data?.properties?.layers || [];
+          const getValue = (name) =>
+            layers.find((l) => l.name === name)?.depths?.[0]?.values?.mean ?? null;
+
+          const phRaw = getValue("phh2o");
+          const nRaw = getValue("nitrogen");
+          const pRaw = getValue("phosphorus");
+          const kRaw = getValue("potassium");
+
+          const clay = getValue("clay") ?? 0;
+          const sand = getValue("sand") ?? 0;
+          let soilType = "Unknown";
+          if (sand > 60) soilType = "Sandy";
+          else if (clay > 40) soilType = "Clay";
+          else if (sand > 30 && clay < 30) soilType = "Loamy";
+          else soilType = "Mixed";
+
+          // 🌦️ WEATHER (OpenWeatherMap)
+          const weatherUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&appid=ec6629c7c794d6bd782d4b3285aa657e&units=metric`;
+          const weatherRes = await axios.get(weatherUrl, { timeout: 15000 });
+
+          let temp = null;
+          let humidity = null;
+          if (weatherRes.status === 200 && weatherRes.data?.main) {
+            temp = weatherRes.data.main.temp;
+            humidity = weatherRes.data.main.humidity;
+          }
+
+          // 🌧️ RAINFALL DATA (Open-Meteo — past 14 days)
+          const meteoUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&hourly=precipitation&past_days=14`;
+          const meteoRes = await axios.get(meteoUrl, { timeout: 20000 });
+
+          const rainData = meteoRes.data?.hourly?.precipitation ?? [];
+          let rainfall = 0;
+
+          if (rainData.length > 0) {
+            // Sum of precipitation for the last 14 days (in mm)
+            rainfall = rainData.reduce((a, b) => a + b, 0);
+          }
+
+          console.log(
+            `✅ Weather for (${lat}, ${lng}): ${temp ?? "--"}°C, ${humidity ?? "--"}%, Rainfall (14 days): ${rainfall.toFixed(
+              1
+            )} mm`
           );
-
-          const soil = soilRes.data.properties || {};
-
-          // Example mapping (you may adjust based on SoilGrids response)
-          const soil_type = soil.taxnwrb?.value || "Loamy";
-          const ph = soil.phh2o?.mean?.value || 6.5;
-          const nitrogen = soil.n?.mean?.value || 30;
-          const phosphorus = soil.p?.mean?.value || 20;
-          const potassium = soil.k?.mean?.value || 25;
-
-          // 2️⃣ Weather data from Open-Meteo
-          const weatherRes = await axios.get(
-            `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`
-          );
-
-          const temp = weatherRes.data.current_weather?.temperature || 28;
-          const humidity = weatherRes.data.current_weather?.humidity || 70;
 
           return {
-            latitude: lat,
-            longitude: lon,
-            soil_type,
-            ph,
-            nitrogen,
-            phosphorus,
-            potassium,
-            temperature: temp,
-            humidity,
+            lat,
+            lng,
+            soil: soilType,
+            ph: phRaw ? (phRaw / 10).toFixed(2) : 6.5,
+            n: nRaw ? nRaw.toFixed(1) : 200,
+            p: pRaw ? pRaw.toFixed(1) : 30,
+            k: kRaw ? kRaw.toFixed(1) : 150,
+            temp: temp !== null ? temp.toFixed(1) : 28,
+            humidity: humidity !== null ? humidity.toFixed(1) : 60,
+            rainfall: rainfall.toFixed(1),
           };
         } catch (err) {
-          console.error("Error fetching API for point", lat, lon, err.message);
+          console.warn(`⚠️ Error fetching for (${lat}, ${lng}): ${err.message}`);
           return {
-            latitude: lat,
-            longitude: lon,
-            soil_type: "Loamy",
+            lat,
+            lng,
+            soil: "Mixed",
             ph: 6.5,
-            nitrogen: 30,
-            phosphorus: 20,
-            potassium: 25,
-            temperature: 28,
-            humidity: 70,
+            n: 200,
+            p: 30,
+            k: 150,
+            temp: 28,
+            humidity: 60,
+            rainfall: 0,
           };
         }
       })
     );
 
-    // 3️⃣ Average all 10 points
-    const avgResult = predictions.reduce(
-      (acc, cur, _, arr) => {
-        acc.ph += cur.ph / arr.length;
-        acc.nitrogen += cur.nitrogen / arr.length;
-        acc.phosphorus += cur.phosphorus / arr.length;
-        acc.potassium += cur.potassium / arr.length;
-        acc.temperature += cur.temperature / arr.length;
-        acc.humidity += cur.humidity / arr.length;
-        return acc;
-      },
-      {
-        ph: 0,
-        nitrogen: 0,
-        phosphorus: 0,
-        potassium: 0,
-        temperature: 0,
-        humidity: 0,
-      }
-    );
+    // 📊 Averages
+    const avg = (key) => {
+      const vals = results.map((r) => parseFloat(r[key])).filter((v) => !isNaN(v));
+      return vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2) : "0.00";
+    };
 
-    // Dominant soil type
-    const soilTypes = predictions.map((p) => p.soil_type);
-    avgResult.soil_type = soilTypes.sort(
-      (a, b) =>
-        soilTypes.filter((v) => v === b).length -
-        soilTypes.filter((v) => v === a).length
-    )[0];
+    results.push({
+      lat: "Average",
+      lng: "",
+      soil: "Mixed",
+      ph: avg("ph"),
+      n: avg("n"),
+      p: avg("p"),
+      k: avg("k"),
+      temp: avg("temp"),
+      humidity: avg("humidity"),
+      rainfall: avg("rainfall"),
+    });
 
-    res.json({ averagedResult: avgResult, points: predictions });
+    res.json({
+      coordinates: limitedCoords.map(([lng, lat]) => ({ lat, lng })),
+      soilTable: results,
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
+    console.error("❌ Error analyzing polygon:", err.message);
+    res.status(500).json({ error: "Failed to analyze polygon" });
   }
 };
