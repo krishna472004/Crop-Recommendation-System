@@ -1,0 +1,37 @@
+{
+  "Rice": {
+    "temp_min": 20,
+    "temp_max": 35,
+    "ph_min": 5.5,
+    "ph_max": 7.0,
+    "rainfall_min": 150
+  },
+  "Wheat": {
+    "temp_min": 10,
+    "temp_max": 25,
+    "ph_min": 6.0,
+    "ph_max": 7.5,
+    "rainfall_min": 50
+  },
+  "Banana": {
+    "temp_min": 24,
+    "temp_max": 35,
+    "ph_min": 5.5,
+    "ph_max": 7.5,
+    "rainfall_min": 120
+  },
+  "Coconut": {
+    "temp_min": 25,
+    "temp_max": 35,
+    "ph_min": 5.0,
+    "ph_max": 8.0,
+    "rainfall_min": 100
+  },
+  "Tomato": {
+    "temp_min": 18,
+    "temp_max": 30,
+    "ph_min": 6.0,
+    "ph_max": 7.0,
+    "rainfall_min": 40
+  }
+}

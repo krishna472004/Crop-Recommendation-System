@@ -1,24 +1,34 @@
-import "leaflet-draw/dist/leaflet.draw.css";
 import "leaflet/dist/leaflet.css";
+import "leaflet-draw/dist/leaflet.draw.css";
+
 import { useRef } from "react";
-import { FeatureGroup, MapContainer, TileLayer, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, FeatureGroup, useMap } from "react-leaflet";
 import { EditControl } from "react-leaflet-draw";
 
+/* ================================
+   Locate Me Button
+================================ */
 const LocateButton = () => {
   const map = useMap();
 
   const locateMe = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const { latitude, longitude } = pos.coords;
-          map.setView([latitude, longitude], 15);
-        },
-        () => alert("Unable to retrieve your location")
-      );
-    } else {
+    if (!navigator.geolocation) {
       alert("Geolocation not supported by your browser");
+      return;
     }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+
+        map.setView([latitude, longitude], 15);
+
+        console.log("📍 User location:", latitude, longitude);
+      },
+      () => {
+        alert("Unable to retrieve your location");
+      }
+    );
   };
 
   return (
@@ -33,7 +43,7 @@ const LocateButton = () => {
         background: "#1976d2",
         color: "white",
         border: "none",
-        borderRadius: "5px",
+        borderRadius: "6px",
         cursor: "pointer",
       }}
     >
@@ -42,21 +52,29 @@ const LocateButton = () => {
   );
 };
 
+/* ================================
+   Map Selector Component
+================================ */
 const MapSelector = ({ onPolygonSelect }) => {
   const mapRef = useRef();
 
-  const onCreated = (e) => {
+  const handleCreated = (e) => {
     const layer = e.layer;
-    const coordinates = layer
-      .getLatLngs()[0]
-      .map((latlng) => [latlng.lng, latlng.lat]);
 
-    const polygon = {
-      type: "Polygon",
-      coordinates: [coordinates],
-    };
+    if (!layer.getLatLngs) return;
 
-    onPolygonSelect(polygon);
+    const latlngs = layer.getLatLngs()[0];
+
+    const coordinates = latlngs.map((point) => ({
+      lat: point.lat,
+      lng: point.lng,
+    }));
+
+    console.log("📍 Polygon Selected:", coordinates);
+
+    onPolygonSelect({
+      coordinates,
+    });
   };
 
   return (
@@ -67,14 +85,17 @@ const MapSelector = ({ onPolygonSelect }) => {
         style={{ height: "80vh", width: "100%" }}
         ref={mapRef}
       >
+        {/* Map Tiles */}
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution="© OpenStreetMap contributors"
         />
+
+        {/* Draw Controls */}
         <FeatureGroup>
           <EditControl
             position="topright"
-            onCreated={onCreated}
+            onCreated={handleCreated}
             draw={{
               polygon: true,
               rectangle: false,
@@ -85,6 +106,8 @@ const MapSelector = ({ onPolygonSelect }) => {
             }}
           />
         </FeatureGroup>
+
+        {/* Locate Me */}
         <LocateButton />
       </MapContainer>
     </div>

@@ -1,0 +1,81 @@
+# -------------------------------
+# 🌐 FRONTEND (React)
+# -------------------------------
+frontend/node_modules/
+frontend/build/
+frontend/.env
+frontend/.DS_Store
+
+# -------------------------------
+# ⚙️ BACKEND (Node.js)
+# -------------------------------
+backend/node_modules/
+backend/.env
+backend/.DS_Store
+backend/logs/
+backend/debug.log
+backend/npm-debug.log*
+backend/yarn-debug.log*
+backend/yarn-error.log*
+
+# Ignore compiled or temporary files
+backend/dist/
+backend/tmp/
+backend/uploads/
+
+# -------------------------------
+# 🤖 ML SERVICE (Python + Deep Learning)
+# -------------------------------
+ml_service/__pycache__/
+ml_service/.env
+ml_service/.DS_Store
+ml_service/*.pyc
+ml_service/venv/
+ml_service/.venv/
+ml_service/.ipynb_checkpoints/
+
+# Model files (large binaries)
+ml_service/model/*.h5
+ml_service/model/*.pt
+ml_service/model/*.pkl
+ml_service/model/*.joblib
+
+# -------------------------------
+# 🧠 GENERAL SYSTEM FILES
+# -------------------------------
+*.log
+*.tmp
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# -------------------------------
+# 🔐 ENVIRONMENT / CONFIG FILES
+# -------------------------------
+.env
+.env.local
+.env.development.local
+.env.production.local
+.env.test.local
+
+# -------------------------------
+# 🧪 IDE & EDITOR FILES
+# -------------------------------
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# -------------------------------
+# 🚀 OS & Dependency Caches
+# -------------------------------
+*.pyc
+*.pyo
+__pycache__/
+.cache/
+coverage/
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
