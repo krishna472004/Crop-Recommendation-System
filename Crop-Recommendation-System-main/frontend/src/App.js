@@ -1,7 +1,7 @@
+import React, { useState } from "react";
 import axios from "axios";
-import { useState } from "react";
 import MapSelector from "./components/MapSelector.jsx";
-
+import CropAnalysis from "./components/CropAnalysis";
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
 
@@ -739,7 +739,8 @@ function AIRecommendationDisplay({ text }) {
 function App() {
   const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(false);
-
+  const [health, setHealth] = useState(null);
+  const [showAnalysisPage, setShowAnalysisPage] = useState(false);
   const handlePolygonSelect = async (polygon) => {
     if (!polygon || !polygon.coordinates) {
       alert("Invalid polygon data");
@@ -748,7 +749,11 @@ function App() {
     setLoading(true);
     try {
       const res = await axios.post("http://localhost:5000/api/map/analyze", { polygon });
-      setAnalysis(res.data);
+setAnalysis(res.data);
+
+// NDVI health API
+const healthRes = await axios.get("http://localhost:5000/api/health/1");
+setHealth(healthRes.data);
     } catch (err) {
       alert("Error analyzing polygon. Check backend console.");
     } finally {
@@ -778,7 +783,9 @@ function App() {
       )}
     </div>
   );
-
+   if (showAnalysisPage) {
+  return <CropAnalysis />;
+}
   return (
     <>
       <style>{styles}</style>
@@ -821,9 +828,49 @@ function App() {
 
           {/* ── Results ── */}
           {analysis && (
+            
             <section className="results-container" id="results-container">
               <h2 className="section-main-title" id="analysis-title">Analysis Results</h2>
+             {/* NDVI Plantation Health */}
+{health && (
+  <div className="card" id="ndvi-card">
+    <div className="card-header">
+      <div className="card-icon green">🌿</div>
+      <div className="card-title">Plantation Health (NDVI Analysis)</div>
+    </div>
 
+    <div className="card-body">
+      <div className="location-grid">
+
+        <div className="location-item">
+          <span className="location-label">Week 1 NDVI</span>
+          <span className="location-value">{health.week1}</span>
+        </div>
+
+        <div className="location-item">
+          <span className="location-label">Week 2 NDVI</span>
+          <span className="location-value">{health.week2}</span>
+        </div>
+
+        <div className="location-item">
+          <span className="location-label">Week 3 NDVI</span>
+          <span className="location-value">{health.week3}</span>
+        </div>
+
+        <div className="location-item">
+          <span className="location-label">Week 4 NDVI</span>
+          <span className="location-value">{health.week4}</span>
+        </div>
+
+        <div className="location-item">
+          <span className="location-label">Overall Plantation Health</span>
+          <span className="location-value">{health.plantationHealth}</span>
+        </div>
+
+      </div>
+    </div>
+  </div>
+)}
               {/* Coordinates */}
               {analysis.coordinates?.length > 0 && (
                 <div className="card coordinates-card" id="coordinates-card">
@@ -1002,7 +1049,35 @@ function App() {
                   </div>
                 </div>
               )}
+             <div style={{ textAlign: "center", marginTop: "20px" }}>
+  <button
+    style={{
+      padding: "10px 20px",
+      borderRadius: "8px",
+      border: "none",
+      background: "#4CAF50",
+      color: "white",
+      cursor: "pointer"
+    }}
+    onClick={() => {
 
+      localStorage.setItem("ndviData", JSON.stringify({
+        location: "Selected Field",
+        lat: analysis.coordinates?.[0]?.lat,
+        lon: analysis.coordinates?.[0]?.lng,
+        week1: health.week1,
+        week2: health.week2,
+        week3: health.week3,
+        week4: health.week4
+      }));
+
+      setShowAnalysisPage(true);
+
+    }}
+  >
+    View Full Crop Analysis
+  </button>
+</div>
             </section>
           )}
         </main>
